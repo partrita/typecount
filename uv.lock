@@ -117,8 +117,8 @@ wheels = [
 ]
 
 [[package]]
-name = "typecount"
-version = "0.1.0"
+name = "typing-counter"
+version = "0.2.0"
 source = { virtual = "." }
 dependencies = [
     { name = "pynput" },

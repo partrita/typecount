@@ -67,7 +67,10 @@ class TypingCounter:
         
         print(f"Data saved: {data}")
 
-root = tk.Tk()
-app = TypingCounter(root)
-root.mainloop()
+def main():
+    root = tk.Tk()
+    app = TypingCounter(root)
+    root.mainloop()
 
+if __name__ == "__main__":
+    main()

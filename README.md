@@ -1,6 +1,8 @@
 # Typing counter
 
-![](./typecount.png)
+![](./src/typecount.png)
+
+
 Typing count for calculation how many type for days
 
 ## How to run
