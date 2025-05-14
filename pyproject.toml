@@ -1,5 +1,5 @@
 [project]
-name = "typing-counter"
+name = "typecount"
 version = "0.2.0"
 description = "A simple typing counter application"
 readme = "README.md"
@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.scripts]
-typing-counter = "typing_counter.app:main"
+typecount = "typecount.app:main"
 
 [tool.uv]
 dev-dependencies = [
