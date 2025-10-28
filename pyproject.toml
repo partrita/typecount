@@ -1,9 +1,9 @@
 [project]
 name = "typecount"
-version = "0.2.0"
-description = "A simple typing counter application"
+version = "0.4.0"
+description = "An enhanced typing counter application with key statistics and visualization"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "pynput>=1.7.7",
 ]
@@ -14,7 +14,5 @@ typecount = "typecount.app:main"
 [tool.uv]
 dev-dependencies = [
     "ipykernel>=6.29.5",
-    "matplotlib>=3.10.0",
-    "pandas>=2.2.3",
     "seaborn>=0.13.2",
 ]
