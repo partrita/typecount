@@ -16,3 +16,15 @@ dev-dependencies = [
     "ipykernel>=6.29.5",
     "seaborn>=0.13.2",
 ]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[tool.pixi.pypi-dependencies]
+typecount = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+pynput = ">=1.8.1,<2"
