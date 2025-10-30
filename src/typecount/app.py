@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from pynput.keyboard import Listener, Key
 import csv
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import os
 from pathlib import Path
 from typing import Optional, Any, Dict
@@ -26,6 +26,12 @@ class TypingCounter:
         self.session_start_time: Optional[datetime] = None
         self.session_end_time: Optional[datetime] = None
         self.total_session_time: float = 0.0  # 초 단위
+        
+        # 15초 비활성 감지를 위한 속성들
+        self.last_key_time: Optional[datetime] = None
+        self.inactive_threshold: float = 15.0  # 15초
+        self.is_session_paused: bool = False
+        self.pause_start_time: Optional[datetime] = None
 
         self._create_widgets()
 
@@ -109,6 +115,9 @@ class TypingCounter:
         """타이핑 카운트를 시작하고 UI를 업데이트합니다."""
         self.is_counting = True
         self.session_start_time = datetime.now()
+        self.last_key_time = None
+        self.is_session_paused = False
+        self.pause_start_time = None
         self.start_button.config(state=tk.DISABLED)
         self.stop_button.config(state=tk.NORMAL)
         self.listener = Listener(on_press=self._on_press)
@@ -119,9 +128,16 @@ class TypingCounter:
         """타이핑 카운트를 중지하고 UI를 업데이트합니다."""
         self.is_counting = False
         self.session_end_time = datetime.now()
-        if self.session_start_time:
+        
+        # 세션이 일시 중단되지 않은 상태라면 현재까지의 시간을 누적
+        if self.session_start_time and not self.is_session_paused:
             session_duration = (self.session_end_time - self.session_start_time).total_seconds()
             self.total_session_time += session_duration
+        
+        # 상태 초기화
+        self.is_session_paused = False
+        self.pause_start_time = None
+        
         self.start_button.config(state=tk.NORMAL)
         self.stop_button.config(state=tk.DISABLED)
         if self.listener:
@@ -131,7 +147,14 @@ class TypingCounter:
     def _on_press(self, key: Any) -> None:
         """키가 눌릴 때마다 카운트를 증가시키고 UI를 업데이트합니다."""
         if self.is_counting:
+            current_time = datetime.now()
+            
+            # 세션이 일시 중단된 상태에서 키 입력이 있으면 재개
+            if self.is_session_paused:
+                self._resume_session(current_time)
+            
             self.count += 1
+            self.last_key_time = current_time
             
             # 키 이름을 문자열로 변환하여 저장
             key_name = self._get_key_name(key)
@@ -154,6 +177,22 @@ class TypingCounter:
         except AttributeError:
             return str(key)
 
+    def _pause_session(self, current_time: datetime) -> None:
+        """세션을 일시 중단합니다."""
+        if not self.is_session_paused and self.session_start_time:
+            self.is_session_paused = True
+            self.pause_start_time = current_time
+            # 현재까지의 세션 시간을 누적
+            session_duration = (current_time - self.session_start_time).total_seconds()
+            self.total_session_time += session_duration
+
+    def _resume_session(self, current_time: datetime) -> None:
+        """세션을 재개합니다."""
+        if self.is_session_paused:
+            self.is_session_paused = False
+            self.session_start_time = current_time
+            self.pause_start_time = None
+
     def reset_count(self) -> None:
         """카운트를 0으로 초기화하고 UI를 업데이트합니다."""
         self.count = 0
@@ -161,6 +200,9 @@ class TypingCounter:
         self.total_session_time = 0.0
         self.session_start_time = None
         self.session_end_time = None
+        self.last_key_time = None
+        self.is_session_paused = False
+        self.pause_start_time = None
         self.label.config(text=f"Count: {self.count}")
         self._update_session_info()
 
@@ -265,11 +307,27 @@ class TypingCounter:
         """세션 정보를 업데이트합니다."""
         if self.is_counting and self.session_start_time:
             current_time = datetime.now()
-            current_session_time = (current_time - self.session_start_time).total_seconds()
-            total_time = self.total_session_time + current_session_time
+            
+            # 15초 비활성 감지
+            if self.last_key_time and not self.is_session_paused:
+                time_since_last_key = (current_time - self.last_key_time).total_seconds()
+                if time_since_last_key >= self.inactive_threshold:
+                    self._pause_session(self.last_key_time + timedelta(seconds=self.inactive_threshold))
+            
+            # 현재 세션 시간 계산
+            if self.is_session_paused:
+                # 일시 중단된 상태: 누적된 시간만 표시
+                total_time = self.total_session_time
+                status = "PAUSED"
+            else:
+                # 활성 상태: 현재 세션 시간 + 누적 시간
+                current_session_time = (current_time - self.session_start_time).total_seconds()
+                total_time = self.total_session_time + current_session_time
+                status = "ACTIVE"
+            
             wpm = self._calculate_wpm(total_time)
             self.session_info_label.config(
-                text=f"Session: {total_time:.1f}s | WPM: {wpm:.1f}"
+                text=f"Session: {total_time:.1f}s | WPM: {wpm:.1f} | {status}"
             )
             # 1초마다 업데이트
             self.master.after(1000, self._update_session_info)
