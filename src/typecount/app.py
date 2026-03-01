@@ -167,7 +167,10 @@ class TypingCounter:
         try:
             # 일반 문자 키의 경우
             if hasattr(key, 'char') and key.char is not None:
-                return key.char
+                if key.char.isprintable():
+                    return key.char
+                else:
+                    return f"hex_{ord(key.char):02x}"
             # 특수 키의 경우
             elif hasattr(key, 'name'):
                 return key.name
@@ -276,24 +279,39 @@ class TypingCounter:
         # 데이터를 날짜순으로 정렬하여 저장
         sorted_dates = sorted(existing_data.keys())
         
-        with open(file_path_obj, "w", newline="", encoding="utf-8") as f:
-            fieldnames = ["Date", "Count", "SessionTime", "WPM", "UniqueKeys", "KeyStats"]
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            for date_key in sorted_dates:
-                data = existing_data[date_key]
-                writer.writerow({
-                    "Date": date_key,
-                    "Count": data["Count"],
-                    "SessionTime": round(data["SessionTime"], 2),
-                    "WPM": round(data["WPM"], 2),
-                    "UniqueKeys": data["UniqueKeys"],
-                    "KeyStats": json.dumps(data["KeyStats"], ensure_ascii=False)
-                })
+        # Atomic write with restricted permissions (0600) to protect sensitive typing data
+        temp_file = file_path_obj.with_suffix(f".tmp{os.getpid()}")
+        try:
+            # Open with 0o600 permissions
+            fd = os.open(temp_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+                fieldnames = ["Date", "Count", "SessionTime", "WPM", "UniqueKeys", "KeyStats"]
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
 
-        messagebox.showinfo("저장 완료", f"데이터가 성공적으로 저장되었습니다.\n파일: {file_path_obj}")
-        print(f"Enhanced data saved to: {file_path_obj}")
+                for date_key in sorted_dates:
+                    data = existing_data[date_key]
+                    writer.writerow({
+                        "Date": date_key,
+                        "Count": data["Count"],
+                        "SessionTime": round(data["SessionTime"], 2),
+                        "WPM": round(data["WPM"], 2),
+                        "UniqueKeys": data["UniqueKeys"],
+                        "KeyStats": json.dumps(data["KeyStats"], ensure_ascii=False)
+                    })
+            # Atomic replacement
+            os.replace(temp_file, file_path_obj)
+        except Exception as e:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            # Use a generic error message to avoid disclosing paths or internal details
+            messagebox.showerror("저장 오류", "데이터를 저장하는 중 오류가 발생했습니다. 권한이나 디스크 공간을 확인해주세요.")
+            print(f"Error saving to {file_path_obj.name}: {str(e)}")
+            return
+
+        # Use only the filename to avoid disclosing full system paths in UI/logs
+        messagebox.showinfo("저장 완료", f"데이터가 성공적으로 저장되었습니다.\n파일: {file_path_obj.name}")
+        print(f"Enhanced data saved to: {file_path_obj.name}")
 
     def _calculate_wpm_from_count_and_time(self, total_count: int, total_time_seconds: float) -> float:
         """총 카운트와 총 시간으로 WPM을 계산합니다."""
