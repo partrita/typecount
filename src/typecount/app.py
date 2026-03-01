@@ -18,6 +18,7 @@ class TypingCounter:
         master.geometry("450x350+100+100")  # Adjusted geometry for new features
 
         self.count = 0
+        self.data_saved = True
         self.is_counting = False
         self.listener: Optional[Listener] = None
         self.key_counts: Dict[str, int] = defaultdict(int)  # 키별 카운트 저장
@@ -101,9 +102,12 @@ class TypingCounter:
         button_frame4.grid(row=4, column=0, pady=5)
         
         self.quit_button = tk.Button(
-            button_frame4, text="Quit", command=self.master.quit
+            button_frame4, text="Quit", command=self.on_quit
         )
         self.quit_button.pack()
+
+        # 창 닫기 프로토콜 설정
+        self.master.protocol("WM_DELETE_WINDOW", self.on_quit)
 
         # 세션 정보 표시 라벨
         self.session_info_label = tk.Label(
@@ -154,6 +158,7 @@ class TypingCounter:
                 self._resume_session(current_time)
             
             self.count += 1
+            self.data_saved = False
             self.last_key_time = current_time
             
             # 키 이름을 문자열로 변환하여 저장
@@ -195,7 +200,12 @@ class TypingCounter:
 
     def reset_count(self) -> None:
         """카운트를 0으로 초기화하고 UI를 업데이트합니다."""
+        if self.count > 0 and not self.data_saved:
+            if not messagebox.askyesno("초기화 확인", "저장되지 않은 데이터가 있습니다.\n정말 초기화하시겠습니까?"):
+                return
+
         self.count = 0
+        self.data_saved = True
         self.key_counts.clear()
         self.total_session_time = 0.0
         self.session_start_time = None
@@ -205,6 +215,13 @@ class TypingCounter:
         self.pause_start_time = None
         self.label.config(text=f"Count: {self.count}")
         self._update_session_info()
+
+    def on_quit(self) -> None:
+        """종료 전 저장 여부를 확인합니다."""
+        if self.count > 0 and not self.data_saved:
+            if not messagebox.askyesno("종료 확인", "저장되지 않은 데이터가 있습니다.\n정말 종료하시겠습니까?"):
+                return
+        self.master.quit()
 
     def save_count(self) -> None:
         """현재 카운트와 키별 통계를 CSV 파일에 저장합니다."""
@@ -292,6 +309,7 @@ class TypingCounter:
                     "KeyStats": json.dumps(data["KeyStats"], ensure_ascii=False)
                 })
 
+        self.data_saved = True
         messagebox.showinfo("저장 완료", f"데이터가 성공적으로 저장되었습니다.\n파일: {file_path_obj}")
         print(f"Enhanced data saved to: {file_path_obj}")
 
