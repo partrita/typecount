@@ -7,11 +7,10 @@ from datetime import date
 from unittest.mock import (
     patch,
     mock_open,
-)  # mock_open might be useful for the cancel test
+)
 from pathlib import Path
 
 # Adjust the import path if your project structure requires it
-# This assumes that the tests are run from the root directory where src is a package
 from src.typecount.app import TypingCounter
 
 
@@ -34,7 +33,8 @@ class TestTypingCounterSaveCount(unittest.TestCase):
         self.master.destroy()
 
     @patch("src.typecount.app.filedialog.asksaveasfilename")
-    def test_save_to_new_file(self, mock_asksaveasfilename):
+    @patch("src.typecount.app.messagebox.showinfo")
+    def test_save_to_new_file(self, mock_showinfo, mock_asksaveasfilename):
         """Test saving data to a new CSV file."""
         test_filename = Path(self.temp_dir_name) / "new_test_data.csv"
         mock_asksaveasfilename.return_value = str(test_filename)
@@ -45,7 +45,7 @@ class TestTypingCounterSaveCount(unittest.TestCase):
         mock_asksaveasfilename.assert_called_once()
         self.assertTrue(test_filename.is_file())
 
-        with open(test_filename, "r", newline="") as f:
+        with open(test_filename, "r", newline="", encoding="utf-8") as f:
             reader = csv.reader(f)
             header = next(reader)
             self.assertEqual(header, ["Date", "Count"])
@@ -55,13 +55,14 @@ class TestTypingCounterSaveCount(unittest.TestCase):
                 next(reader)
 
     @patch("src.typecount.app.filedialog.asksaveasfilename")
-    def test_append_to_existing_file(self, mock_asksaveasfilename):
+    @patch("src.typecount.app.messagebox.showinfo")
+    def test_append_to_existing_file(self, mock_showinfo, mock_asksaveasfilename):
         """Test appending data to an existing CSV file."""
         test_filename = Path(self.temp_dir_name) / "existing_test_data.csv"
 
         # Pre-populate the file
         initial_data = [["Date", "Count"], ["2023-01-01", "100"]]
-        with open(test_filename, "w", newline="") as f:
+        with open(test_filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerows(initial_data)
 
@@ -72,7 +73,7 @@ class TestTypingCounterSaveCount(unittest.TestCase):
 
         mock_asksaveasfilename.assert_called_once()
 
-        with open(test_filename, "r", newline="") as f:
+        with open(test_filename, "r", newline="", encoding="utf-8") as f:
             reader = csv.reader(f)
             # Check header
             header = next(reader)
@@ -89,7 +90,7 @@ class TestTypingCounterSaveCount(unittest.TestCase):
     @patch("src.typecount.app.filedialog.asksaveasfilename")
     @patch(
         "src.typecount.app.open", new_callable=mock_open
-    )  # Mock open to check if it's called
+    )
     def test_save_cancel_dialog(self, mock_file_open, mock_asksaveasfilename):
         """Test user cancelling the save dialog."""
         mock_asksaveasfilename.return_value = None  # Simulate user cancelling
@@ -98,11 +99,8 @@ class TestTypingCounterSaveCount(unittest.TestCase):
         self.app.save_count()
 
         mock_asksaveasfilename.assert_called_once()
-        mock_file_open.assert_not_called()  # Ensure open() was not called
+        mock_file_open.assert_not_called()
 
-        # Additionally, check that no unexpected files were created in temp_dir
-        # This is a bit redundant if mock_open.assert_not_called() works as expected
-        # but can be a good sanity check.
         files_in_temp_dir = os.listdir(self.temp_dir_name)
         self.assertEqual(
             len(files_in_temp_dir),
